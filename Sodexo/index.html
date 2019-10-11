@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Sodexo">
+    <title>Sodexo Menu</title>
+    <link rel="stylesheet" type="text/css" href="styles.css" media="all">
+    <link rel="manifest" href="manifest.json">
+  </head>
+  <body onload="checkMenu()">
+    <div id="container">
+      <h2 id="restaurantTitle">Ravintola Bittipannu</h2>
+      <h3 id="dateText"></h3>
+      <table id="menuTable">
+      </table>
+    </div>
+
+    <!-- Register service worker -->
+    <script>
+        if('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('./serviceworker.js')
+            .then(function() {
+              console.log('Service Worker Registered');
+            });
+        }
+    </script>
+    <script>
+        var now = new Date().toLocaleDateString();                
+
+        // check if already fetched todays menu. Green IT.
+        function checkMenu(){
+            if(useLastMenu()){
+                console.log("use last");
+            }
+            else{
+                console.log("fetch");
+                fetchMenu()
+            }
+        }
+
+        function fetchMenu() {
+          //var url = 'https://www.sodexo.fi/ruokalistat/output/daily_json/5865/2019/10/11/fi';
+          var php = 'sodexo.php?';
+          var request = new XMLHttpRequest();
+          request.onreadystatechange = function() {
+            if (request.readyState === 4){//XMLHttpRequest.DONE) {
+              if (request.status === 200) {
+                var jsonData = JSON.parse(request.response);
+                // build menu texts from json 
+                buildMenuTexts(jsonData);
+                
+                // store values to local storage
+                localStorage.setItem("date", now);
+                localStorage.setItem("response", request.response);
+              }
+            }
+          };
+          request.open('GET', php, true);
+          request.send();  
+        }
+
+        function useLastMenu() {
+            oldMenu = localStorage.getItem("response");
+            oldDate = localStorage.getItem("date");
+            if(oldMenu && oldDate && oldDate == now){
+                buildMenuTexts(JSON.parse(oldMenu));
+                return true;
+            } 
+            return false;
+        }
+
+        // builds menu texts from json data
+        function buildMenuTexts(jsonData) {
+            // Meta data
+            var meta = jsonData.meta;
+                if(meta){
+                    var title = meta.ref_title;
+                    if(title){
+                        document.getElementById("restaurantTitle").innerHTML = title;
+                    }
+                }
+                document.getElementById("dateText").innerHTML = now;
+
+                // create menu table
+                createMenuTable(jsonData);
+        }
+
+        function createMenuTable(jsonData) {
+            var tableNode = document.getElementById("menuTable");
+            // Menu builder
+            for (var i = 0; i < jsonData.courses.length; i++) {
+                var course = jsonData.courses[i];
+                // create this and that
+                let category = document.createElement('th');
+                category.innerHTML = course.category;
+                let title_fi = document.createElement('td');
+                title_fi.innerHTML = course.title_fi;
+                let title_en = document.createElement('td');
+                title_en.innerHTML = course.title_en;                
+                let properties = document.createElement('td');
+                properties.innerHTML = course.properties;
+                // Left side
+                let categoryRow = document.createElement('tr');
+                categoryRow.appendChild(category);
+                let titleFiRow = document.createElement('tr');
+                titleFiRow.appendChild(title_fi);
+                let titleEnRow = document.createElement('tr');
+                titleEnRow.appendChild(title_en);
+                let propertiesRow = document.createElement('tr');
+                propertiesRow.appendChild(properties);
+                // Add to left side if not null
+                let infoTd = document.createElement('td');   
+                if(category){             
+                    infoTd.appendChild(categoryRow);
+                }
+                if(title_fi){
+                    infoTd.appendChild(titleFiRow);
+                }
+                if(title_en){
+                    infoTd.appendChild(titleEnRow);
+                }
+                if(properties){
+                    infoTd.appendChild(propertiesRow);
+                }
+                // Right side
+                let price = document.createElement('td');
+                price.innerHTML = course.price;
+                // add to the row
+                let rowNode = document.createElement('tr');
+                rowNode.appendChild(infoTd);
+                rowNode.appendChild(price);
+                // add border between rows
+                if(i != 0){
+                    rowNode.setAttribute('border', 1);
+                }
+                // Add to the table
+                tableNode.appendChild(rowNode);
+            }
+        }
+    </script>    
+  </body>
+</html>
